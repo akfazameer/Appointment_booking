@@ -1,0 +1,337 @@
+{
+  "name": "Leverify Quest Appointment Booking and Calendar Management System",
+  "nodes": [
+    {
+      "parameters": {
+        "public": true,
+        "initialMessages": "Hello! I'm the virtual assistant for Leverify Quest. I can help you schedule a consultation for creating and managing digital business cards. To get started, please provide:\n\n1. Your full name\n2. Your phone number\n3. Your desired date and time for the consultation\n\nOur office hours are:\n- Monday - Friday: 9:00 AM - 8:00 PM\n- Saturday: 9:00 AM - 1:00 PM\n- Sunday: Closed\n\nEach consultation lasts 1 hour with a 15-minute break between appointments.",
+        "options": {
+          "loadPreviousSession": "memory"
+        }
+      },
+      "id": "88023a9c-f3ee-426e-b3db-963fd9e605d5",
+      "name": "Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        2384,
+        400
+      ],
+      "webhookId": "fd2fe163-e6b4-4a39-8a0f-e36b67d02ad0"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=You are a virtual assistant for Leverify Quest, specializing in managing appointment bookings. Your primary task is to help users schedule consultations, ensuring availability while maintaining a smooth experience for clients interested in creating and managing digital business cards.\n\n🕒 Office Hours\nMonday - Friday: 9:00 AM - 8:00 PM\nSaturday: 9:00 AM - 1:00 PM\nSunday: ❌ Closed\nConsultation Duration: 1 hour\nBreak Between Patients: 15 minutes\n\n📅 Booking Process\n\n1️⃣ Request User Information (Mandatory):\n- Full Name\n- Phone Number\n- Desired Date and Time\n\n2️⃣ Availability Check:\n- If the requested time is outside office hours → offer only available slots.\n- If the requested time is available, ask for confirmation and book it.\n- If the requested time is unavailable, apologize and suggest the actual available slots on the requested day (between 9:00 AM and 8:00 PM, respecting breaks).\n\nExample:\nIf a user requests an appointment at 10:00 AM, check Google Calendar to confirm availability between 9:00 AM and 8:00 PM, considering the consultation duration (1 hour) and the 15-minute breaks.\n\n🚨 Do not confirm the appointment immediately—you must receive the user's confirmation first.\n\n3️⃣ Confirmation & Updates:\n- Confirm availability with the user before finalizing.\n- Update Google Calendar & Google Sheets after every booking.\n- Make sure to add the descriptive title of every event you create in Google calendar.\n- For modifications or cancellations, free the slot and update the schedule.\n\n##Tools:\nUse \"Check Availability\" to check available slots.\nUse \"Create Event\" to book the appointment.\nUse \"Add Data\" to record patient information.\n\n💬 Communication\n✅ Respond clearly, professionally, and in a friendly manner.\n✅ Always confirm the final date and time with the user.\n✅ Ensure Google Calendar and Google Sheets are updated after every booking.\n\n📅 Today's date: {{ $now }}.\n\nCRITICAL DATE FORMATTING:\n- Always use the CURRENT year (2025) for appointments\n- Format dates as: YYYY-MM-DDTHH:MM:SS (e.g., 2025-01-22T16:00:00)\n- Never use past dates\n- Ensure start and end times are exactly 1 hour apart\n- Add timezone offset if needed (e.g., 2025-01-22T16:00:00+05:00 for Pakistan time)\n\nVERY IMPORTANT SECTION — Appointment Details\nYou MUST return all these fields in valid JSON:\n\n{\n  \"eventTitle\": \"A short title using the patient's name\",\n  \"eventDescription\": \"A detailed description including patient name, condition, and phone number\",\n  \"startDateTime\": \"Start time in ISO format (YYYY-MM-DDTHH:MM:SS)\",\n  \"endDateTime\": \"End time in ISO format (YYYY-MM-DDTHH:MM:SS)\",\n  \"attendeeEmail\": \"Patient email if provided, otherwise empty string\",\n  \"notes\": \"Any extra information the user mentioned\"\n}\n\nYou must never ask the user follow-up questions. If information is missing, make a reasonable assumption and continue."
+        }
+      },
+      "id": "7274fddb-477a-453a-bf07-12bb6297e11f",
+      "name": "Appointment Booking Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3,
+      "position": [
+        2856,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to check Google Calendar availability for requested time slots. This helps verify if a consultation slot is free before booking. You can filter events by date range to check availability.",
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "akfazameer4@gmail.com",
+          "mode": "list",
+          "cachedResultName": "akfazameer4@gmail.com"
+        },
+        "timeMin": "={{ $fromAI('startDate', 'Start date and time to check availability from (ISO format)', 'string') }}",
+        "timeMax": "={{ $fromAI('endDate', 'End date and time to check availability until (ISO format)', 'string') }}",
+        "options": {}
+      },
+      "id": "ae798f08-8ee9-41a8-bb00-72eb20c66bc3",
+      "name": "Check Availability",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2864,
+        624
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "s7GelG6QBxU9BBEV",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to create a new appointment event in Google Calendar after the user confirms the booking. Include the patient name, phone number, and consultation details in the event description.",
+        "calendar": {
+          "__rl": true,
+          "value": "akfazameer4@gmail.com",
+          "mode": "list",
+          "cachedResultName": "akfazameer4@gmail.com"
+        },
+        "start": "={{ $fromAI('startDateTime') }}",
+        "end": "={{ $fromAI('endDateTime') }}",
+        "additionalFields": {
+          "attendees": [],
+          "description": "={{ $fromAI('eventDescription') }}",
+          "summary": "={{ $fromAI('eventTitle') }}"
+        }
+      },
+      "id": "e2b805b6-8a0d-4886-be9c-f91c97012b1a",
+      "name": "Create Event",
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2992,
+        624
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "s7GelG6QBxU9BBEV",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to add appointment details to Google Sheets after a successful booking. The AI must provide the following fields:\n- name: Patient's full name\n- phone: Patient's phone number\n- date: Appointment date in YYYY-MM-DD format (e.g., 2025-11-27)\n- time: Appointment time in HH:MM AM/PM format (e.g., 01:00 PM - 02:00 PM)\n- notes: Any additional notes or information (optional)\n\nEnsure all fields are properly formatted before adding to the sheet.",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1IvPiken50R7IW9uqyLbSvI_-8yC_6NdWT0SIHimA5nQ",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "1064551137",
+          "mode": "id"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "time",
+              "displayName": "time",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "sessionId",
+              "displayName": "sessionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "action",
+              "displayName": "action",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "chatInput",
+              "displayName": "chatInput",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "toolCallId",
+              "displayName": "toolCallId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "342ea859-3ecc-45ac-8a64-d2e3d90f521e",
+      "name": "Add Data",
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        3120,
+        624
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "DCa28n4kATAUUrAr",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2736,
+        624
+      ],
+      "id": "87b8de99-1f93-4dba-bf87-59f3696e1737",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "So35Nguw5SDrbzUM",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        2456,
+        624
+      ],
+      "id": "0d825a58-6522-4083-ab06-14be63f7ad0d",
+      "name": "Simple Memory"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Availability": {
+      "ai_tool": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Data": {
+      "ai_tool": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Appointment Booking Agent",
+            "type": "ai_memory",
+            "index": 0
+          },
+          {
+            "node": "Chat Trigger",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "de9e7b83-77bb-48f2-b2d7-0c519cb5868e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b5d52d541b4fad18e7aa7697ad312a4cc30b902555da9272c915943d619f19b4"
+  },
+  "id": "YaHKu5mx1vPBxNBP",
+  "tags": []
+}
